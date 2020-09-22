@@ -32,7 +32,8 @@ class TestSmartLightDatabase {
                 driverClassName = "org.h2.Driver",
                 jdbcUrl = "jdbc:h2:mem:test",
                 username = null,
-                password = null,)
+                password = null,
+            )
         }
     }
 
@@ -49,7 +50,7 @@ class TestSmartLightDatabase {
 
         // Assert added correctly
         smartLights = database.getAllSmartLights()
-        assertThat(smartLights).isNotEmpty()
+        assertThat(smartLights).hasSize(1)
         val smartLight = smartLights[0]
         assertThat(smartLight).isEqualTo(testSmartLight)
     }
@@ -147,6 +148,111 @@ class TestSmartLightDatabase {
         assertThat(smartLight2).isEqualTo(testSmartLight2)
     }
 
+    @Test
+    fun `Insert one smart light and remove`() = runBlocking {
+        // Check we don't have any data
+        var smartLights = database.getAllSmartLights()
+        assertThat(smartLights).isEmpty()
+
+        // Insert first smart light
+        val testSmartLight = getTestSmartLight()
+        val inserted = database.upsertSmartLight(testSmartLight)
+        assertThat(inserted).isTrue()
+
+        // Assert added correctly
+        smartLights = database.getAllSmartLights()
+        assertThat(smartLights).hasSize(1)
+        val smartLight = smartLights[0]
+        assertThat(smartLight).isEqualTo(testSmartLight)
+
+        // Remove smart light
+        val removed = database.removeSmartLight(testSmartLight.macAddress)
+        assertThat(removed).isTrue()
+
+        // Assert removed correctly
+        smartLights = database.getAllSmartLights()
+        assertThat(smartLights).isEmpty()
+    }
+
+    @Test
+    fun `Insert one smart light and remove it twice`() = runBlocking {
+        // Check we don't have any data
+        var smartLights = database.getAllSmartLights()
+        assertThat(smartLights).isEmpty()
+
+        // Insert first smart light
+        val testSmartLight = getTestSmartLight()
+        val inserted = database.upsertSmartLight(testSmartLight)
+        assertThat(inserted).isTrue()
+
+        // Assert added correctly
+        smartLights = database.getAllSmartLights()
+        assertThat(smartLights).hasSize(1)
+        val smartLight = smartLights[0]
+        assertThat(smartLight).isEqualTo(testSmartLight)
+
+        // Remove smart light
+        var removed = database.removeSmartLight(testSmartLight.macAddress)
+        assertThat(removed).isTrue()
+
+        // Assert removed correctly
+        smartLights = database.getAllSmartLights()
+        assertThat(smartLights).isEmpty()
+
+        // Remove smart light again
+        removed = database.removeSmartLight(testSmartLight.macAddress)
+        assertThat(removed).isFalse()
+
+        // Assert that database is empty
+        smartLights = database.getAllSmartLights()
+        assertThat(smartLights).isEmpty()
+    }
+
+    @Test
+    fun `Insert smart light and get it`() = runBlocking {
+        // Check we don't have any data
+        var smartLights = database.getAllSmartLights()
+        assertThat(smartLights).isEmpty()
+
+        // Insert first smart light
+        val testSmartLight = getTestSmartLight()
+        val inserted = database.upsertSmartLight(testSmartLight)
+        assertThat(inserted).isTrue()
+
+        // Assert added correctly
+        smartLights = database.getAllSmartLights()
+        assertThat(smartLights).hasSize(1)
+        val smartLight = smartLights[0]
+        assertThat(smartLight).isEqualTo(testSmartLight)
+
+        // Get smart light
+        val smartLight2 = database.getSmartLight(testSmartLight.macAddress)
+        assertThat(smartLight2).isNotNull()
+        assertThat(smartLight2).isEqualTo(testSmartLight)
+    }
+
+    @Test
+    fun `Insert smart light and get the wrong one`() = runBlocking {
+        // Check we don't have any data
+        var smartLights = database.getAllSmartLights()
+        assertThat(smartLights).isEmpty()
+
+        // Insert first smart light
+        val testSmartLight = getTestSmartLight()
+        val inserted = database.upsertSmartLight(testSmartLight)
+        assertThat(inserted).isTrue()
+
+        // Assert added correctly
+        smartLights = database.getAllSmartLights()
+        assertThat(smartLights).hasSize(1)
+        val smartLight = smartLights[0]
+        assertThat(smartLight).isEqualTo(testSmartLight)
+
+        // Get wrong smart light
+        val smartLight2 = database.getSmartLight(testSmartLight.macAddress + "1")
+        assertThat(smartLight2).isNull()
+    }
+
     private fun getTestSmartLight(): SmartLight {
         return SmartLight(
             name = "Test Smart Light",
@@ -167,17 +273,31 @@ class TestSmartLightDatabase {
         )
     }
 
+    private var flip = false
+        get() {
+            return field.apply {
+                field = !field
+            }
+        }
     private fun getTestSmartLightData(): SmartLightData {
         return SmartLightData(
             ipAddress = "192.168.1.${Random.nextInt(0, 255)}",
             isOn = Random.nextBoolean(),
             capabilities = listOf(
-                SmartLightCapability.SmartLightColor.SmartLightKelvin(
-                    kelvin = Random.nextInt(1000, 7500),
-                    brightness = Random.nextFloat()
-                ),
+                if(flip){
+                    SmartLightCapability.SmartLightColor.SmartLightKelvin(
+                        kelvin = Random.nextInt(1000, 7500),
+                        brightness = Random.nextFloat(),
+                    )
+                } else {
+                    SmartLightCapability.SmartLightColor.SmartLightHSB(
+                        hue = Random.nextFloat(),
+                        saturation = Random.nextFloat(),
+                        brightness = Random.nextFloat(),
+                    )
+                },
                 SmartLightCapability.SmartLightLocation(
-                    "Home/Bedroom"
+                    "Home/Bedroom",
                 )
             )
         )
