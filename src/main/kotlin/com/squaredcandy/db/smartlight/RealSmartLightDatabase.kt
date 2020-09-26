@@ -1,5 +1,6 @@
 package com.squaredcandy.db.smartlight
 
+import com.squaredcandy.db.ChangeType
 import com.squaredcandy.db.smartlight.model.entity.*
 import com.squaredcandy.db.smartlight.model.schema.SmartLightCapabilityColorSchema
 import com.squaredcandy.db.smartlight.model.schema.SmartLightCapabilityLocationSchema
@@ -59,16 +60,26 @@ internal class RealSmartLightDatabase(
         }?.toSmartLight()
     }
 
-    override fun getOnSmartLightUpdated(macAddress: String): Flow<SmartLight> {
+    override fun getOnSmartLightChanged(macAddress: String): Flow<ChangeType<SmartLight>> {
         return callbackFlow {
             val hook = hook@ { entityChange: EntityChange ->
-                if(
-                    entityChange.entityClass != SmartLightEntity ||
-                    entityChange.changeType == EntityChangeType.Removed
-                ) return@hook
-                val smartLightEntity = entityChange.toEntity(SmartLightEntity)
-                if(smartLightEntity != null && smartLightEntity.macAddress == macAddress) {
-                    offer(smartLightEntity.toSmartLight())
+                if(entityChange.entityClass != SmartLightEntity) return@hook
+                when(entityChange.changeType) {
+                    EntityChangeType.Created -> {
+                        val smartLightEntity = entityChange.toEntity(SmartLightEntity)
+                        if(smartLightEntity != null && smartLightEntity.macAddress == macAddress) {
+                            offer(ChangeType.Inserted(smartLightEntity.toSmartLight()))
+                        }
+                    }
+                    EntityChangeType.Updated -> {
+                        val smartLightEntity = entityChange.toEntity(SmartLightEntity)
+                        if(smartLightEntity != null && smartLightEntity.macAddress == macAddress) {
+                            offer(ChangeType.Updated(smartLightEntity.toSmartLight()))
+                        }
+                    }
+                    EntityChangeType.Removed -> {
+                        offer(ChangeType.Removed)
+                    }
                 }
             }
             EntityHook.subscribe(hook)

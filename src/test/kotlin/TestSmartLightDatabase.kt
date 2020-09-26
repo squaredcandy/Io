@@ -1,5 +1,6 @@
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
+import com.squaredcandy.db.ChangeType
 import com.squaredcandy.europa.model.SmartLight
 import com.squaredcandy.europa.model.SmartLightCapability
 import com.squaredcandy.europa.model.SmartLightData
@@ -265,10 +266,12 @@ class TestSmartLightDatabase {
         // Setup data
         val testSmartLight = getTestSmartLight()
         // Setup flow
-        database.getOnSmartLightUpdated(testSmartLight.macAddress).test {
+        database.getOnSmartLightChanged(testSmartLight.macAddress).test {
             val inserted = database.upsertSmartLight(testSmartLight)
             assertThat(inserted).isTrue()
-            assertThat(expectItem()).isEqualTo(testSmartLight)
+            val item = expectItem()
+            assertThat(item).isInstanceOf(ChangeType.Inserted::class.java)
+            assertThat((item as ChangeType.Inserted).item).isEqualTo(testSmartLight)
 
             expectNoEvents()
             cancelAndIgnoreRemainingEvents()
@@ -285,10 +288,12 @@ class TestSmartLightDatabase {
         // Setup data
         val testSmartLight = getTestSmartLight()
         // Setup flow
-        database.getOnSmartLightUpdated(testSmartLight.macAddress).test {
+        database.getOnSmartLightChanged(testSmartLight.macAddress).test {
             var inserted = database.upsertSmartLight(testSmartLight)
             assertThat(inserted).isTrue()
-            assertThat(expectItem()).isEqualTo(testSmartLight)
+            var item = expectItem()
+            assertThat(item).isInstanceOf(ChangeType.Inserted::class.java)
+            assertThat((item as ChangeType.Inserted).item).isEqualTo(testSmartLight)
 
             val testSmartLight2 = testSmartLight.copy(
                 smartLightData = testSmartLight.smartLightData.toMutableList().apply {
@@ -297,7 +302,9 @@ class TestSmartLightDatabase {
             )
             inserted = database.upsertSmartLight(testSmartLight2)
             assertThat(inserted).isTrue()
-            assertThat(expectItem()).isEqualTo(testSmartLight2)
+            item = expectItem()
+            assertThat(item).isInstanceOf(ChangeType.Updated::class.java)
+            assertThat((item as ChangeType.Updated).item).isEqualTo(testSmartLight2)
 
             expectNoEvents()
             cancelAndIgnoreRemainingEvents()
@@ -314,10 +321,12 @@ class TestSmartLightDatabase {
         // Setup data
         val testSmartLight = getTestSmartLight()
         // Setup flow
-        database.getOnSmartLightUpdated(testSmartLight.macAddress).test {
+        database.getOnSmartLightChanged(testSmartLight.macAddress).test {
             var inserted = database.upsertSmartLight(testSmartLight)
             assertThat(inserted).isTrue()
-            assertThat(expectItem()).isEqualTo(testSmartLight)
+            var item = expectItem()
+            assertThat(item).isInstanceOf(ChangeType.Inserted::class.java)
+            assertThat((item as ChangeType.Inserted).item).isEqualTo(testSmartLight)
 
             inserted = database.upsertSmartLight(testSmartLight)
             assertThat(inserted).isFalse()
@@ -337,13 +346,17 @@ class TestSmartLightDatabase {
         // Setup data
         val testSmartLight = getTestSmartLight()
         // Setup flow
-        database.getOnSmartLightUpdated(testSmartLight.macAddress).test {
+        database.getOnSmartLightChanged(testSmartLight.macAddress).test {
             val inserted = database.upsertSmartLight(testSmartLight)
             assertThat(inserted).isTrue()
-            assertThat(expectItem()).isEqualTo(testSmartLight)
+            var item = expectItem()
+            assertThat(item).isInstanceOf(ChangeType.Inserted::class.java)
+            assertThat((item as ChangeType.Inserted).item).isEqualTo(testSmartLight)
 
             val removed = database.removeSmartLight(testSmartLight.macAddress)
             assertThat(removed).isTrue()
+            item = expectItem()
+            assertThat(item).isInstanceOf(ChangeType.Removed::class.java)
 
             expectNoEvents()
             cancelAndIgnoreRemainingEvents()
