@@ -1,4 +1,6 @@
+import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
+import com.squaredcandy.db.ChangeType
 import com.squaredcandy.europa.model.SmartLight
 import com.squaredcandy.europa.model.SmartLightCapability
 import com.squaredcandy.europa.model.SmartLightData
@@ -7,8 +9,9 @@ import com.squaredcandy.db.smartlight.model.DatabaseProvider
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.*
 import kotlin.random.Random
+import kotlin.time.ExperimentalTime
 
-@TestInstance(TestInstance.Lifecycle.PER_METHOD)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class TestSmartLightDatabase {
 
     @AfterEach
@@ -74,7 +77,7 @@ class TestSmartLightDatabase {
 
         // Insert second smart light
         val inserted2 = database.upsertSmartLight(testSmartLight)
-        assertThat(inserted2).isTrue()
+        assertThat(inserted2).isFalse()
 
         // Assert added correctly
         smartLights = database.getAllSmartLights()
@@ -251,6 +254,113 @@ class TestSmartLightDatabase {
         // Get wrong smart light
         val smartLight2 = database.getSmartLight(testSmartLight.macAddress + "1")
         assertThat(smartLight2).isNull()
+    }
+
+    @ExperimentalTime
+    @Test
+    fun `Insert smart light and receive it through the flow`() = runBlocking {
+        // Check we don't have any data
+        val smartLights = database.getAllSmartLights()
+        assertThat(smartLights).isEmpty()
+
+        // Setup data
+        val testSmartLight = getTestSmartLight()
+        // Setup flow
+        database.getOnSmartLightChanged(testSmartLight.macAddress).test {
+            val inserted = database.upsertSmartLight(testSmartLight)
+            assertThat(inserted).isTrue()
+            val item = expectItem()
+            assertThat(item).isInstanceOf(ChangeType.Inserted::class.java)
+            assertThat((item as ChangeType.Inserted).item).isEqualTo(testSmartLight)
+
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @ExperimentalTime
+    @Test
+    fun `Insert two smart lights and receive it through the flow`() = runBlocking {
+        // Check we don't have any data
+        val smartLights = database.getAllSmartLights()
+        assertThat(smartLights).isEmpty()
+
+        // Setup data
+        val testSmartLight = getTestSmartLight()
+        // Setup flow
+        database.getOnSmartLightChanged(testSmartLight.macAddress).test {
+            var inserted = database.upsertSmartLight(testSmartLight)
+            assertThat(inserted).isTrue()
+            var item = expectItem()
+            assertThat(item).isInstanceOf(ChangeType.Inserted::class.java)
+            assertThat((item as ChangeType.Inserted).item).isEqualTo(testSmartLight)
+
+            val testSmartLight2 = testSmartLight.copy(
+                smartLightData = testSmartLight.smartLightData.toMutableList().apply {
+                    add(getTestSmartLightData())
+                }
+            )
+            inserted = database.upsertSmartLight(testSmartLight2)
+            assertThat(inserted).isTrue()
+            item = expectItem()
+            assertThat(item).isInstanceOf(ChangeType.Updated::class.java)
+            assertThat((item as ChangeType.Updated).item).isEqualTo(testSmartLight2)
+
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @ExperimentalTime
+    @Test
+    fun `Insert two smart lights of the same data and receive only one in the flow`() = runBlocking {
+        // Check we don't have any data
+        val smartLights = database.getAllSmartLights()
+        assertThat(smartLights).isEmpty()
+
+        // Setup data
+        val testSmartLight = getTestSmartLight()
+        // Setup flow
+        database.getOnSmartLightChanged(testSmartLight.macAddress).test {
+            var inserted = database.upsertSmartLight(testSmartLight)
+            assertThat(inserted).isTrue()
+            var item = expectItem()
+            assertThat(item).isInstanceOf(ChangeType.Inserted::class.java)
+            assertThat((item as ChangeType.Inserted).item).isEqualTo(testSmartLight)
+
+            inserted = database.upsertSmartLight(testSmartLight)
+            assertThat(inserted).isFalse()
+
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @ExperimentalTime
+    @Test
+    fun `Insert smart light and delete it and receive only the insert data in the flow`() = runBlocking {
+        // Check we don't have any data
+        val smartLights = database.getAllSmartLights()
+        assertThat(smartLights).isEmpty()
+
+        // Setup data
+        val testSmartLight = getTestSmartLight()
+        // Setup flow
+        database.getOnSmartLightChanged(testSmartLight.macAddress).test {
+            val inserted = database.upsertSmartLight(testSmartLight)
+            assertThat(inserted).isTrue()
+            var item = expectItem()
+            assertThat(item).isInstanceOf(ChangeType.Inserted::class.java)
+            assertThat((item as ChangeType.Inserted).item).isEqualTo(testSmartLight)
+
+            val removed = database.removeSmartLight(testSmartLight.macAddress)
+            assertThat(removed).isTrue()
+            item = expectItem()
+            assertThat(item).isInstanceOf(ChangeType.Removed::class.java)
+
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     private fun getTestSmartLight(): SmartLight {

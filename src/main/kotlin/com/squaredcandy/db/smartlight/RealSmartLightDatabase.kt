@@ -1,5 +1,6 @@
 package com.squaredcandy.db.smartlight
 
+import com.squaredcandy.db.ChangeType
 import com.squaredcandy.db.smartlight.model.entity.*
 import com.squaredcandy.db.smartlight.model.schema.SmartLightCapabilityColorSchema
 import com.squaredcandy.db.smartlight.model.schema.SmartLightCapabilityLocationSchema
@@ -9,12 +10,16 @@ import kotlinx.coroutines.Dispatchers
 import com.squaredcandy.europa.model.SmartLight
 import com.squaredcandy.europa.model.SmartLightCapability
 import com.squaredcandy.europa.model.SmartLightData
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import org.jetbrains.exposed.dao.*
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.transactions.transaction
-import java.time.format.DateTimeFormatter
+import java.util.UUID
 
 internal class RealSmartLightDatabase(
     private val database: Database
@@ -55,12 +60,40 @@ internal class RealSmartLightDatabase(
         }?.toSmartLight()
     }
 
+    override fun getOnSmartLightChanged(macAddress: String): Flow<ChangeType<SmartLight>> {
+        return callbackFlow {
+            val hook = hook@ { entityChange: EntityChange ->
+                if(entityChange.entityClass != SmartLightEntity) return@hook
+                when(entityChange.changeType) {
+                    EntityChangeType.Created -> {
+                        val smartLightEntity = entityChange.toEntity(SmartLightEntity)
+                        if(smartLightEntity != null && smartLightEntity.macAddress == macAddress) {
+                            offer(ChangeType.Inserted(smartLightEntity.toSmartLight()))
+                        }
+                    }
+                    EntityChangeType.Updated -> {
+                        val smartLightEntity = entityChange.toEntity(SmartLightEntity)
+                        if(smartLightEntity != null && smartLightEntity.macAddress == macAddress) {
+                            offer(ChangeType.Updated(smartLightEntity.toSmartLight()))
+                        }
+                    }
+                    EntityChangeType.Removed -> {
+                        offer(ChangeType.Removed)
+                    }
+                }
+            }
+            EntityHook.subscribe(hook)
+            awaitClose { EntityHook.unsubscribe(hook) }
+        }
+    }
+
     override suspend fun removeSmartLight(macAddress: String): Boolean {
         val smartLight = suspendedTransaction {
             SmartLightEntity.find { SmartLightSchema.macAddress eq macAddress }.firstOrNull()
         } ?: return false
         transaction {
             smartLight.delete()
+            registerChange(SmartLightEntity, smartLight.id, EntityChangeType.Removed)
         }
         return true
     }
@@ -71,85 +104,84 @@ internal class RealSmartLightDatabase(
     }
 
     private suspend fun insertSmartLight(smartLight: SmartLight): Boolean {
-        val smartLightEntity = suspendedTransaction {
-            SmartLightEntity.new {
+        suspendedTransaction {
+            val smartLightEntity = SmartLightEntity.new {
                 name = smartLight.name
                 macAddress = smartLight.macAddress
-                created = smartLight.created.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
-                lastUpdated = smartLight.lastUpdated.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+                created = smartLight.created
+                lastUpdated = smartLight.lastUpdated
             }
+            insertSmartLightData(smartLight.smartLightData, smartLightEntity.id)
         }
-
-        insertSmartLightData(smartLight.smartLightData, smartLightEntity.id)
-
         return true
     }
 
     private suspend fun updateSmartLight(entity: SmartLightEntity, smartLight: SmartLight): Boolean {
-        val currentList = suspendedTransaction {
-            entity.data.map { it }
-        }
-        // Update Smart Light
-        suspendedTransaction {
-            entity.name = smartLight.name
-            entity.lastUpdated = smartLight.lastUpdated.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
-        }
+        val currentSmartLight = entity.toSmartLight()
 
-        insertSmartLightData(smartLight.smartLightData.filterNot { data ->
-            currentList.any { it.timestamp == data.timestamp.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME) }
-        }, entity.id)
+        val filter = smartLight.smartLightData.filterNot { data ->
+            currentSmartLight.smartLightData.any { it.timestamp == data.timestamp }
+        }
+        return if(currentSmartLight.name != smartLight.name || filter.isNotEmpty()) {
+            suspendedTransaction {
+                entity.name = smartLight.name
+                entity.lastUpdated = smartLight.lastUpdated
 
-        return true
+                insertSmartLightData(filter, entity.id)
+            }
+            suspendedTransaction {
+                registerChange(SmartLightEntity, entity.id, EntityChangeType.Updated)
+            }
+            true
+        } else false
     }
 
-    private suspend fun insertSmartLightData(smartLightData: List<SmartLightData>, entityId: EntityID<Int>) {
+    private fun Transaction.insertSmartLightData(smartLightData: List<SmartLightData>, entityId: EntityID<UUID>) {
         smartLightData.forEach { data ->
-            val smartLightDataEntity = suspendedTransaction {
-                SmartLightDataEntity.new {
-                    smartLight = entityId
-                    timestamp = data.timestamp.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
-                    ipAddress = data.ipAddress
-                    isOn = data.isOn
-                }
+            val smartLightDataEntity = SmartLightDataEntity.new {
+                smartLight = entityId
+                timestamp = data.timestamp
+                ipAddress = data.ipAddress
+                isOn = data.isOn
             }
 
             data.capabilities.forEach { capability ->
                 when(capability) {
                     is SmartLightCapability.SmartLightColor.SmartLightHSB -> {
-                        val smartLightColor = suspendedTransaction {
-                            SmartLightCapabilityColorEntity.new {
-                                hue = capability.hue
-                                saturation = capability.saturation
-                                brightness = capability.brightness
-                            }
-                        }
-                        suspendedTransaction {
-                            smartLightDataEntity.color = smartLightColor
-                        }
+                        val smartLightColor = capability.toEntity()
+                        smartLightDataEntity.color = smartLightColor
                     }
                     is SmartLightCapability.SmartLightColor.SmartLightKelvin -> {
-                        val smartLightColor = suspendedTransaction {
-                            SmartLightCapabilityColorEntity.new {
-                                kelvin = capability.kelvin
-                                brightness = capability.brightness
-                            }
-                        }
-                        suspendedTransaction {
-                            smartLightDataEntity.color = smartLightColor
-                        }
+                        val smartLightColor = capability.toEntity()
+                        smartLightDataEntity.color = smartLightColor
                     }
                     is SmartLightCapability.SmartLightLocation -> {
-                        val smartLightLocation = suspendedTransaction {
-                            SmartLightCapabilityLocationEntity.new {
-                                location = capability.location
-                            }
-                        }
-                        suspendedTransaction {
-                            smartLightDataEntity.location = smartLightLocation
-                        }
+                        val smartLightLocation = capability.toEntity()
+                        smartLightDataEntity.location = smartLightLocation
                     }
                 }
             }
+        }
+    }
+
+    private fun SmartLightCapability.SmartLightColor.SmartLightHSB.toEntity(): SmartLightCapabilityColorEntity {
+        return SmartLightCapabilityColorEntity.new {
+            this.hue = this@toEntity.hue
+            this.saturation = this@toEntity.saturation
+            this.brightness = this@toEntity.brightness
+        }
+    }
+
+    private fun SmartLightCapability.SmartLightColor.SmartLightKelvin.toEntity(): SmartLightCapabilityColorEntity {
+        return SmartLightCapabilityColorEntity.new {
+            this.kelvin = this@toEntity.kelvin
+            this.brightness = this@toEntity.brightness
+        }
+    }
+
+    private fun SmartLightCapability.SmartLightLocation.toEntity(): SmartLightCapabilityLocationEntity {
+        return SmartLightCapabilityLocationEntity.new {
+            this.location = this@toEntity.location
         }
     }
 
