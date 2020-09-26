@@ -23,6 +23,7 @@ dependencies {
     val hikari = "3.4.5"
     val coroutine = "1.3.9"
     val truth = "1.0.1"
+    val turbine = "0.2.1"
 
     implementation(kotlin("stdlib"))
 
@@ -36,6 +37,7 @@ dependencies {
     implementation("com.impossibl.pgjdbc-ng:pgjdbc-ng:$pgjdbc")
     implementation("com.zaxxer:HikariCP:$hikari")
 
+    testImplementation("app.cash.turbine:turbine:$turbine")
     testImplementation("com.google.truth:truth:$truth")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutine")
     testImplementation("com.h2database:h2:$h2")
