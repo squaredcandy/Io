@@ -9,6 +9,10 @@ import javax.sql.DataSource
 
 object DatabaseProvider {
 
+    private var dataSource: DataSource? = null
+    private val database by lazy {
+        Database.connect(dataSource ?: getDataSource())
+    }
     private fun getDataSource(
         driverClassName: String = "com.impossibl.postgres.jdbc.PGDriver",
         jdbcUrl: String = "jdbc:pgsql://localhost:5432/postgres",
@@ -32,13 +36,12 @@ object DatabaseProvider {
         username: String? = "postgres",
         password: String? = "1qaz",
     ): SmartLightDatabaseInterface {
-        val dataSource = getDataSource(
+        dataSource = getDataSource(
             driverClassName,
             jdbcUrl,
             username,
             password,
         )
-        val database = Database.connect(dataSource)
         return RealSmartLightDatabase(database)
     }
 }
