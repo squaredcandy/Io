@@ -14,7 +14,6 @@ import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.transactions.transaction
-import java.time.format.DateTimeFormatter
 
 internal class RealSmartLightDatabase(
     private val database: Database
@@ -75,8 +74,8 @@ internal class RealSmartLightDatabase(
             SmartLightEntity.new {
                 name = smartLight.name
                 macAddress = smartLight.macAddress
-                created = smartLight.created.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
-                lastUpdated = smartLight.lastUpdated.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+                created = smartLight.created
+                lastUpdated = smartLight.lastUpdated
             }
         }
 
@@ -92,11 +91,11 @@ internal class RealSmartLightDatabase(
         // Update Smart Light
         suspendedTransaction {
             entity.name = smartLight.name
-            entity.lastUpdated = smartLight.lastUpdated.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+            entity.lastUpdated = smartLight.lastUpdated
         }
 
         insertSmartLightData(smartLight.smartLightData.filterNot { data ->
-            currentList.any { it.timestamp == data.timestamp.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME) }
+            currentList.any { it.timestamp == data.timestamp }
         }, entity.id)
 
         return true
@@ -107,7 +106,7 @@ internal class RealSmartLightDatabase(
             val smartLightDataEntity = suspendedTransaction {
                 SmartLightDataEntity.new {
                     smartLight = entityId
-                    timestamp = data.timestamp.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+                    timestamp = data.timestamp
                     ipAddress = data.ipAddress
                     isOn = data.isOn
                 }
