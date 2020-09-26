@@ -8,11 +8,15 @@ import org.jetbrains.exposed.dao.IntEntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatter
 
 internal class SmartLightDataEntity(id: EntityID<Int>): IntEntity(id) {
     companion object : IntEntityClass<SmartLightDataEntity>(SmartLightDataSchema)
     var smartLight by SmartLightDataSchema.smartLightRef
-    var timestamp by SmartLightDataSchema.timestamp
+    var timestamp: OffsetDateTime by SmartLightDataSchema.timestamp.transform(
+        { it.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME) },
+        { OffsetDateTime.parse(it) }
+    )
     var ipAddress by SmartLightDataSchema.ipAddress
     var isOn by SmartLightDataSchema.isOn
     var color by SmartLightCapabilityColorEntity optionalReferencedOn  SmartLightDataSchema.colorRef
@@ -32,7 +36,7 @@ internal fun SmartLightDataEntity.toSmartLightData(): SmartLightData {
     if(color != null) capabilities.add(color)
     if(location != null) capabilities.add(location)
     return SmartLightData(
-        timestamp = OffsetDateTime.parse(timestamp),
+        timestamp = timestamp,
         ipAddress = ipAddress,
         isOn = isOn,
         capabilities = capabilities
