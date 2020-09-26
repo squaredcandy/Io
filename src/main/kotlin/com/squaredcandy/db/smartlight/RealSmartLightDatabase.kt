@@ -14,6 +14,7 @@ import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.transactions.transaction
+import java.util.UUID
 
 internal class RealSmartLightDatabase(
     private val database: Database
@@ -101,7 +102,7 @@ internal class RealSmartLightDatabase(
         return true
     }
 
-    private suspend fun insertSmartLightData(smartLightData: List<SmartLightData>, entityId: EntityID<Int>) {
+    private suspend fun insertSmartLightData(smartLightData: List<SmartLightData>, entityId: EntityID<UUID>) {
         smartLightData.forEach { data ->
             val smartLightDataEntity = suspendedTransaction {
                 SmartLightDataEntity.new {
