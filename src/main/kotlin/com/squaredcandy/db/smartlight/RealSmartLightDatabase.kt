@@ -118,19 +118,26 @@ internal class RealSmartLightDatabase(
 
     private suspend fun updateSmartLight(entity: SmartLightEntity, smartLight: SmartLight): Boolean {
         val currentSmartLight = entity.toSmartLight()
-
-        val filter = smartLight.smartLightData.filterNot { data ->
+        val newData = smartLight.smartLightData.filterNot { data ->
             currentSmartLight.smartLightData.any { it.timestamp == data.timestamp }
         }
-        return if(currentSmartLight.name != smartLight.name || filter.isNotEmpty()) {
+        val nameChanged = currentSmartLight.name != smartLight.name
+        val dataChanged = newData.isNotEmpty()
+        return if(nameChanged || dataChanged) {
             suspendedTransaction {
-                entity.name = smartLight.name
                 entity.lastUpdated = smartLight.lastUpdated
-
-                insertSmartLightData(filter, entity.id)
+                if(nameChanged) {
+                    entity.name = smartLight.name
+                }
+                if(dataChanged) {
+                    insertSmartLightData(newData, entity.id)
+                }
             }
-            suspendedTransaction {
-                registerChange(SmartLightEntity, entity.id, EntityChangeType.Updated)
+            // Changing the name triggers an update however changing the data doesn't so we need to do it ourselves
+            if(!nameChanged && dataChanged) {
+                suspendedTransaction {
+                    registerChange(SmartLightEntity, entity.id, EntityChangeType.Updated)
+                }
             }
             true
         } else false
