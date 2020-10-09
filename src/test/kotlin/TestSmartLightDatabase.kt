@@ -296,6 +296,7 @@ class TestSmartLightDatabase {
             assertThat((item as ChangeType.Inserted).item).isEqualTo(testSmartLight)
 
             val testSmartLight2 = testSmartLight.copy(
+                name = "new name",
                 smartLightData = testSmartLight.smartLightData.toMutableList().apply {
                     add(getTestSmartLightData())
                 }
