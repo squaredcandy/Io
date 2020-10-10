@@ -1,6 +1,6 @@
 package com.squaredcandy.io.db.smartlight
 
-import com.squaredcandy.io.db.ChangeType
+import com.squaredcandy.io.db.util.ChangeType
 import com.squaredcandy.io.db.smartlight.model.entity.*
 import com.squaredcandy.io.db.smartlight.model.schema.SmartLightCapabilityColorSchema
 import com.squaredcandy.io.db.smartlight.model.schema.SmartLightCapabilityLocationSchema
@@ -10,9 +10,15 @@ import kotlinx.coroutines.Dispatchers
 import com.squaredcandy.europa.model.SmartLight
 import com.squaredcandy.europa.model.SmartLightCapability
 import com.squaredcandy.europa.model.SmartLightData
+import com.squaredcandy.europa.util.Result
+import com.squaredcandy.europa.util.getResultSuspended
+import com.squaredcandy.io.db.util.DatabaseErrorType
+import com.squaredcandy.io.db.util.DatabaseException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.emptyFlow
 import org.jetbrains.exposed.dao.*
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.*
@@ -23,7 +29,7 @@ import java.util.UUID
 
 internal class RealSmartLightDatabase(
     private val database: Database
-) : SmartLightDatabaseInterface {
+) : SmartLightDatabase {
 
     private var closed: Boolean = false
 
@@ -42,25 +48,32 @@ internal class RealSmartLightDatabase(
     }
 
     override suspend fun getAllSmartLights(): List<SmartLight> {
+        if(closed) return emptyList()
         return suspendedTransaction {
             SmartLightEntity.all().map { it.toSmartLight() }
         }
     }
 
-    override suspend fun upsertSmartLight(smartLight: SmartLight): Boolean {
+    override suspend fun upsertSmartLight(smartLight: SmartLight): Result<Unit> {
+        if(closed) return Result.Failure(DatabaseException(DatabaseErrorType.CLOSED))
         val entity = suspendedTransaction {
             SmartLightEntity.find { SmartLightSchema.macAddress eq smartLight.macAddress }.firstOrNull()
         }
         return if(entity != null) updateSmartLight(entity, smartLight) else insertSmartLight(smartLight)
     }
 
-    override suspend fun getSmartLight(macAddress: String): SmartLight? {
-        return suspendedTransaction {
+    override suspend fun getSmartLight(macAddress: String): Result<SmartLight> {
+        if(closed) return Result.Failure(DatabaseException(DatabaseErrorType.CLOSED))
+        val smartLight = suspendedTransaction {
             SmartLightEntity.find { SmartLightSchema.macAddress eq macAddress }.firstOrNull()
         }?.toSmartLight()
+        return if(smartLight != null) Result.Success(smartLight)
+        else Result.Failure(DatabaseException(DatabaseErrorType.NOT_FOUND))
     }
 
+    @ExperimentalCoroutinesApi
     override fun getOnSmartLightChanged(macAddress: String): Flow<ChangeType<SmartLight>> {
+        if(closed) return emptyFlow()
         return callbackFlow {
             val hook = hook@ { entityChange: EntityChange ->
                 if(entityChange.entityClass != SmartLightEntity) return@hook
@@ -87,15 +100,16 @@ internal class RealSmartLightDatabase(
         }
     }
 
-    override suspend fun removeSmartLight(macAddress: String): Boolean {
+    override suspend fun removeSmartLight(macAddress: String): Result<SmartLight> {
+        if(closed) return Result.Failure(DatabaseException(DatabaseErrorType.CLOSED))
         val smartLight = suspendedTransaction {
             SmartLightEntity.find { SmartLightSchema.macAddress eq macAddress }.firstOrNull()
-        } ?: return false
+        } ?: return Result.Failure(DatabaseException(DatabaseErrorType.NOT_FOUND))
         transaction {
             smartLight.delete()
             registerChange(SmartLightEntity, smartLight.id, EntityChangeType.Removed)
         }
-        return true
+        return Result.Success(smartLight.toSmartLight())
     }
 
     override fun closeDatabase() {
@@ -103,20 +117,21 @@ internal class RealSmartLightDatabase(
         closed = true
     }
 
-    private suspend fun insertSmartLight(smartLight: SmartLight): Boolean {
-        suspendedTransaction {
-            val smartLightEntity = SmartLightEntity.new {
-                name = smartLight.name
-                macAddress = smartLight.macAddress
-                created = smartLight.created
-                lastUpdated = smartLight.lastUpdated
+    private suspend fun insertSmartLight(smartLight: SmartLight): Result<Unit> {
+        return getResultSuspended {
+            suspendedTransaction {
+                val smartLightEntity = SmartLightEntity.new {
+                    name = smartLight.name
+                    macAddress = smartLight.macAddress
+                    created = smartLight.created
+                    lastUpdated = smartLight.lastUpdated
+                }
+                insertSmartLightData(smartLight.smartLightData, smartLightEntity.id)
             }
-            insertSmartLightData(smartLight.smartLightData, smartLightEntity.id)
         }
-        return true
     }
 
-    private suspend fun updateSmartLight(entity: SmartLightEntity, smartLight: SmartLight): Boolean {
+    private suspend fun updateSmartLight(entity: SmartLightEntity, smartLight: SmartLight): Result<Unit> {
         val currentSmartLight = entity.toSmartLight()
         val newData = smartLight.smartLightData.filterNot { data ->
             currentSmartLight.smartLightData.any { it.timestamp == data.timestamp }
@@ -139,8 +154,8 @@ internal class RealSmartLightDatabase(
                     registerChange(SmartLightEntity, entity.id, EntityChangeType.Updated)
                 }
             }
-            true
-        } else false
+            Result.Success(Unit)
+        } else Result.Failure(DatabaseException(DatabaseErrorType.NO_CHANGE))
     }
 
     private fun Transaction.insertSmartLightData(smartLightData: List<SmartLightData>, entityId: EntityID<UUID>) {

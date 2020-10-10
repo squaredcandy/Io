@@ -15,7 +15,7 @@ repositories {
 }
 
 dependencies {
-    val europa = "0.0.3"
+    val europa = "0.0.6"
     val exposed = "0.25.1"
     val slf4j = "1.7.30"
     val h2 = "1.4.199"
