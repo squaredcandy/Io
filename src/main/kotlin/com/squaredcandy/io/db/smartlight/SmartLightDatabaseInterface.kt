@@ -1,6 +1,6 @@
-package com.squaredcandy.db.smartlight
+package com.squaredcandy.io.db.smartlight
 
-import com.squaredcandy.db.ChangeType
+import com.squaredcandy.io.db.ChangeType
 import com.squaredcandy.europa.model.SmartLight
 import kotlinx.coroutines.flow.Flow
 

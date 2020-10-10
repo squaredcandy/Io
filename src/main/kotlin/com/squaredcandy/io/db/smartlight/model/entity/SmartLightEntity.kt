@@ -1,7 +1,7 @@
-package com.squaredcandy.db.smartlight.model.entity
+package com.squaredcandy.io.db.smartlight.model.entity
 
-import com.squaredcandy.db.smartlight.model.schema.SmartLightDataSchema
-import com.squaredcandy.db.smartlight.model.schema.SmartLightSchema
+import com.squaredcandy.io.db.smartlight.model.schema.SmartLightDataSchema
+import com.squaredcandy.io.db.smartlight.model.schema.SmartLightSchema
 import com.squaredcandy.europa.model.SmartLight
 import org.jetbrains.exposed.dao.UUIDEntity
 import org.jetbrains.exposed.dao.UUIDEntityClass

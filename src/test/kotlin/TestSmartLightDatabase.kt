@@ -1,11 +1,11 @@
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
-import com.squaredcandy.db.ChangeType
+import com.squaredcandy.io.db.ChangeType
 import com.squaredcandy.europa.model.SmartLight
 import com.squaredcandy.europa.model.SmartLightCapability
 import com.squaredcandy.europa.model.SmartLightData
-import com.squaredcandy.db.smartlight.SmartLightDatabaseInterface
-import com.squaredcandy.db.smartlight.model.DatabaseProvider
+import com.squaredcandy.io.db.smartlight.SmartLightDatabaseInterface
+import com.squaredcandy.io.db.smartlight.model.DatabaseProvider
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.*
 import kotlin.random.Random
