@@ -1,9 +1,9 @@
-package com.squaredcandy.db.smartlight.model
+package com.squaredcandy.io.db.smartlight.model
 
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
-import com.squaredcandy.db.smartlight.RealSmartLightDatabase
-import com.squaredcandy.db.smartlight.SmartLightDatabaseInterface
+import com.squaredcandy.io.db.smartlight.RealSmartLightDatabase
+import com.squaredcandy.io.db.smartlight.SmartLightDatabaseInterface
 import org.jetbrains.exposed.sql.Database
 import javax.sql.DataSource
 

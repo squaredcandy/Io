@@ -1,11 +1,11 @@
-package com.squaredcandy.db.smartlight
+package com.squaredcandy.io.db.smartlight
 
-import com.squaredcandy.db.ChangeType
-import com.squaredcandy.db.smartlight.model.entity.*
-import com.squaredcandy.db.smartlight.model.schema.SmartLightCapabilityColorSchema
-import com.squaredcandy.db.smartlight.model.schema.SmartLightCapabilityLocationSchema
-import com.squaredcandy.db.smartlight.model.schema.SmartLightDataSchema
-import com.squaredcandy.db.smartlight.model.schema.SmartLightSchema
+import com.squaredcandy.io.db.ChangeType
+import com.squaredcandy.io.db.smartlight.model.entity.*
+import com.squaredcandy.io.db.smartlight.model.schema.SmartLightCapabilityColorSchema
+import com.squaredcandy.io.db.smartlight.model.schema.SmartLightCapabilityLocationSchema
+import com.squaredcandy.io.db.smartlight.model.schema.SmartLightDataSchema
+import com.squaredcandy.io.db.smartlight.model.schema.SmartLightSchema
 import kotlinx.coroutines.Dispatchers
 import com.squaredcandy.europa.model.SmartLight
 import com.squaredcandy.europa.model.SmartLightCapability

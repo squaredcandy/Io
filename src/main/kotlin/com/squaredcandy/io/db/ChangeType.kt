@@ -1,4 +1,4 @@
-package com.squaredcandy.db
+package com.squaredcandy.io.db
 
 sealed class ChangeType<out T> {
     data class Inserted<T>(val item: T): ChangeType<T>()

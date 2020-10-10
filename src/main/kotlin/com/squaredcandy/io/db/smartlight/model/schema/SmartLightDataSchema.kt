@@ -1,4 +1,4 @@
-package com.squaredcandy.db.smartlight.model.schema
+package com.squaredcandy.io.db.smartlight.model.schema
 
 import org.jetbrains.exposed.dao.id.UUIDTable
 import org.jetbrains.exposed.sql.ReferenceOption
