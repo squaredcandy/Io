@@ -14,6 +14,7 @@ import ResultSubject.Companion.assertThat
 import com.squaredcandy.io.db.util.DatabaseErrorType
 import com.squaredcandy.io.db.util.DatabaseException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import java.time.OffsetDateTime
 
 @ExperimentalCoroutinesApi
 @ExperimentalTime
@@ -124,6 +125,112 @@ class TestSmartLightDatabase {
         assertThat(smartLights).hasSize(1)
         val smartLight2 = smartLights.last()
         assertThat(smartLight2).isNotEqualTo(testSmartLight)
+        assertThat(smartLight2.smartLightData).hasSize(2)
+        assertThat(smartLight2.smartLightData).contains(testSmartLight.smartLightData.first())
+        assertThat(smartLight2.smartLightData).contains(testSmartLight2.smartLightData.first())
+    }
+
+    @Test
+    fun `Insert one smart light then update with second dataset with same timestamp`() = runBlocking {
+        // Check we don't have any data
+        var smartLights = database.getAllSmartLights()
+        assertThat(smartLights).isEmpty()
+
+        // Add first smart light
+        val testSmartLight = getTestSmartLight()
+        val inserted1 = database.upsertSmartLight(testSmartLight)
+        assertThat(inserted1).isSuccess()
+
+        // Assert added correctly
+        smartLights = database.getAllSmartLights()
+        assertThat(smartLights).hasSize(1)
+        val smartLight1 = smartLights.last()
+        assertThat(smartLight1).isEqualTo(testSmartLight)
+
+        // Add same smart light with second set of data
+        val testSmartLight2 = testSmartLight.copy(
+            smartLightData = testSmartLight.smartLightData.toMutableList().apply {
+                add(getTestSmartLightData(testSmartLight.smartLightData.last().timestamp))
+            }
+        )
+        val inserted2 = database.upsertSmartLight(testSmartLight2)
+        assertThat(inserted2).isFailure()
+
+        // Assert added correctly
+        smartLights = database.getAllSmartLights()
+        assertThat(smartLights).hasSize(1)
+        val smartLight2 = smartLights.last()
+        assertThat(smartLight2).isEqualTo(testSmartLight)
+    }
+
+
+    @Test
+    fun `Insert one smart light then update with the same dataset with different timestamp`() = runBlocking {
+        // Check we don't have any data
+        var smartLights = database.getAllSmartLights()
+        assertThat(smartLights).isEmpty()
+
+        // Add first smart light
+        val testSmartLight = getTestSmartLight()
+        val inserted1 = database.upsertSmartLight(testSmartLight)
+        assertThat(inserted1).isSuccess()
+
+        // Assert added correctly
+        smartLights = database.getAllSmartLights()
+        assertThat(smartLights).hasSize(1)
+        val smartLight1 = smartLights.last()
+        assertThat(smartLight1).isEqualTo(testSmartLight)
+
+        // Add same smart light with second set of data
+        val testSmartLight2 = testSmartLight.copy(
+            smartLightData = testSmartLight.smartLightData.toMutableList().apply {
+                add(testSmartLight.smartLightData.first().copy(
+                    timestamp = OffsetDateTime.now()
+                ))
+            }
+        )
+        val inserted2 = database.upsertSmartLight(testSmartLight2)
+        assertThat(inserted2).isFailure()
+
+        // Assert added correctly
+        smartLights = database.getAllSmartLights()
+        assertThat(smartLights).hasSize(1)
+        val smartLight2 = smartLights.last()
+        assertThat(smartLight2).isEqualTo(testSmartLight)
+    }
+
+    @Test
+    fun `Insert one smart light then update with a dataset with a prior timestamp`() = runBlocking {
+        // Check we don't have any data
+        var smartLights = database.getAllSmartLights()
+        assertThat(smartLights).isEmpty()
+
+        // Add first smart light
+        val testSmartLight = getTestSmartLight()
+        val inserted1 = database.upsertSmartLight(testSmartLight)
+        assertThat(inserted1).isSuccess()
+
+        // Assert added correctly
+        smartLights = database.getAllSmartLights()
+        assertThat(smartLights).hasSize(1)
+        val smartLight1 = smartLights.last()
+        assertThat(smartLight1).isEqualTo(testSmartLight)
+
+        // Add same smart light with second set of data
+        val testSmartLight2 = testSmartLight.copy(
+            smartLightData = testSmartLight.smartLightData.toMutableList().apply {
+                add(getTestSmartLightData(
+                    customTimestamp = OffsetDateTime.now().minusMinutes(1L)
+                ))
+            }
+        )
+        val inserted2 = database.upsertSmartLight(testSmartLight2)
+        assertThat(inserted2).isSuccess()
+
+        // Assert added correctly
+        smartLights = database.getAllSmartLights()
+        assertThat(smartLights).hasSize(1)
+        val smartLight2 = smartLights.last()
         assertThat(smartLight2.smartLightData).hasSize(2)
         assertThat(smartLight2.smartLightData).contains(testSmartLight.smartLightData.first())
         assertThat(smartLight2.smartLightData).contains(testSmartLight2.smartLightData.first())
@@ -391,9 +498,10 @@ class TestSmartLightDatabase {
                 field = !field
             }
         }
-    private fun getTestSmartLightData(): SmartLightData {
+    private fun getTestSmartLightData(customTimestamp: OffsetDateTime = OffsetDateTime.now()): SmartLightData {
         return SmartLightData(
             ipAddress = "192.168.1.${Random.nextInt(0, 255)}",
+            timestamp = customTimestamp,
             isOn = Random.nextBoolean(),
             capabilities = listOf(
                 if(flip){
