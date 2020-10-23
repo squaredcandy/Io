@@ -37,6 +37,6 @@ internal fun SmartLightEntity.toSmartLight(): SmartLight {
         macAddress = macAddress,
         created = created,
         lastUpdated = lastUpdated,
-        transaction { data.map { it.toSmartLightData() } }
+        transaction { data.map { it.toSmartLightData() }.sortedBy { it.timestamp } }
     )
 }

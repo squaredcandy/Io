@@ -132,12 +132,56 @@ internal class RealSmartLightDatabase(
     }
 
     private suspend fun updateSmartLight(entity: SmartLightEntity, smartLight: SmartLight): Result<Unit> {
-        val currentSmartLight = entity.toSmartLight()
-        val newData = smartLight.smartLightData.filterNot { data ->
-            currentSmartLight.smartLightData.any { it.timestamp == data.timestamp }
+        val smartLightData = suspendedTransaction {
+            entity.data.map { it.toSmartLightDataWithId() }
+                .plus(smartLight.smartLightData.map { null to it })
+                .sortedBy { it.second.timestamp }
+                .toMutableList()
         }
-        val nameChanged = currentSmartLight.name != smartLight.name
-        val dataChanged = newData.isNotEmpty()
+
+        val removeList = mutableListOf<UUID>()
+        // Ensure we have at least 2 data points
+        if(smartLightData.size > 1) {
+            var currentIndex = 0
+            while(currentIndex < smartLightData.lastIndex) {
+                val (currentId, currentData) = smartLightData[currentIndex]
+                val (nextId, nextData) = smartLightData[currentIndex + 1]
+
+                // We have the same timestamp or if the data points are the same we keep the one in the db or the first
+                // one submitted
+                if(
+                    currentData.timestamp == nextData.timestamp ||
+                    (
+                        currentData.ipAddress == nextData.ipAddress &&
+                        currentData.isOn == nextData.isOn &&
+                        currentData.isConnected == nextData.isConnected &&
+                        currentData.capabilities == nextData.capabilities
+                    )
+                ) {
+                    if(currentId == null && nextId == null) {
+                        smartLightData.removeAt(currentIndex + 1)
+                    } else if (currentId != null && nextId == null) {
+                        smartLightData.removeAt(currentIndex + 1)
+                    } else if (currentId == null && nextId != null) {
+                        smartLightData.removeAt(currentIndex)
+                    } else if (currentId != null && nextId != null) {
+                        removeList.add(nextId)
+                        smartLightData.removeAt(currentIndex + 1)
+                    } else {
+                        // Something went very wrong
+                        return Result.Failure(DatabaseException(DatabaseErrorType.INTERNAL_ERROR))
+                    }
+                    continue
+                }
+                currentIndex++
+            }
+        }
+
+        val nameChanged = entity.name != smartLight.name
+        val newData = smartLightData.mapNotNull { (id, data) ->
+            if(id != null) null else data
+        }
+        val dataChanged = newData.isNotEmpty() || removeList.isNotEmpty()
         return if(nameChanged || dataChanged) {
             suspendedTransaction {
                 entity.lastUpdated = smartLight.lastUpdated
@@ -145,6 +189,7 @@ internal class RealSmartLightDatabase(
                     entity.name = smartLight.name
                 }
                 if(dataChanged) {
+                    removeList.forEach { SmartLightDataEntity[it].delete() }
                     insertSmartLightData(newData, entity.id)
                 }
             }

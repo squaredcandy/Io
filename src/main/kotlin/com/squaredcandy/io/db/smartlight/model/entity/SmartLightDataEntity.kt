@@ -43,3 +43,17 @@ internal fun SmartLightDataEntity.toSmartLightData(): SmartLightData {
         capabilities = capabilities
     )
 }
+
+internal fun SmartLightDataEntity.toSmartLightDataWithId(): Pair<UUID, SmartLightData> {
+    val color = transaction { color?.toSmartLightColor() }
+    val location = transaction { location?.toSmartLightLocation() }
+    val capabilities = mutableListOf<SmartLightCapability>()
+    if(color != null) capabilities.add(color)
+    if(location != null) capabilities.add(location)
+    return id.value to SmartLightData(
+        timestamp = timestamp,
+        ipAddress = ipAddress,
+        isOn = isOn,
+        capabilities = capabilities
+    )
+}

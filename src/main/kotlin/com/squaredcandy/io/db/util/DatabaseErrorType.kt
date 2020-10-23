@@ -21,4 +21,9 @@ enum class DatabaseErrorType(val message: String) {
      * The current database is closed
      */
     CLOSED("This database is currently closed"),
+
+    /**
+     * Something went wrong with the database
+     */
+    INTERNAL_ERROR("Something went wrong with the database"),
 }
