@@ -14,9 +14,10 @@ interface SmartLightDatabase {
     /**
      * Get all the smart lights in the database
      *
-     * @return A list of smart lights or an empty list if the database is closed
+     * @return A [Result.Success] of all the smart lights in the database
+     * @exception DatabaseException in [Result.Failure] with type [DatabaseErrorType.CLOSED] if the database is closed
      */
-    suspend fun getAllSmartLights(): List<SmartLight>
+    suspend fun getAllSmartLights(): Result<List<SmartLight>>
 
     /**
      * Insert or update a smart light in the database

@@ -47,10 +47,12 @@ internal class RealSmartLightDatabase(
         closed = false
     }
 
-    override suspend fun getAllSmartLights(): List<SmartLight> {
-        if(closed) return emptyList()
-        return suspendedTransaction {
-            SmartLightEntity.all().map { it.toSmartLight() }
+    override suspend fun getAllSmartLights(): Result<List<SmartLight>> {
+        if(closed) return Result.Failure(DatabaseException(DatabaseErrorType.CLOSED))
+        return getResultSuspended {
+            suspendedTransaction {
+                SmartLightEntity.all().map { it.toSmartLight() }
+            }
         }
     }
 

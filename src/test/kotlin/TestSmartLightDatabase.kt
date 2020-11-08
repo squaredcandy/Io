@@ -4,6 +4,7 @@ import com.squaredcandy.io.db.util.ChangeType
 import com.squaredcandy.europa.model.SmartLight
 import com.squaredcandy.europa.model.SmartLightCapability
 import com.squaredcandy.europa.model.SmartLightData
+import com.squaredcandy.europa.util.Result
 import com.squaredcandy.io.db.smartlight.SmartLightDatabase
 import com.squaredcandy.io.db.util.DatabaseProvider
 import kotlinx.coroutines.runBlocking
@@ -11,6 +12,10 @@ import org.junit.jupiter.api.*
 import kotlin.random.Random
 import kotlin.time.ExperimentalTime
 import ResultSubject.Companion.assertThat
+import ResultListSubject.Companion.assertThat
+import com.squaredcandy.europa.util.getValueOrNull
+import com.squaredcandy.europa.util.getValueOrThrow
+import com.squaredcandy.europa.util.onSuccessSuspended
 import com.squaredcandy.io.db.util.DatabaseErrorType
 import com.squaredcandy.io.db.util.DatabaseException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -22,9 +27,11 @@ import java.time.OffsetDateTime
 class TestSmartLightDatabase {
 
     @AfterEach
-    fun setupDatabase() = runBlocking {
-        database.getAllSmartLights().forEach {
-            database.removeSmartLight(it.macAddress)
+    fun setupDatabase(): Unit = runBlocking {
+        database.getAllSmartLights().onSuccessSuspended { smartLights ->
+            smartLights.forEach { 
+                database.removeSmartLight(it.macAddress) 
+            }
         }
     }
 
@@ -51,7 +58,7 @@ class TestSmartLightDatabase {
     fun `Insert one smart light`() = runBlocking {
         // Check we don't have any data
         var smartLights = database.getAllSmartLights()
-        assertThat(smartLights).isEmpty()
+        assertThat(smartLights).isSuccessListEmpty()
 
         // Insert first smart light
         val testSmartLight = getTestSmartLight()
@@ -60,8 +67,8 @@ class TestSmartLightDatabase {
 
         // Assert added correctly
         smartLights = database.getAllSmartLights()
-        assertThat(smartLights).hasSize(1)
-        val smartLight = smartLights[0]
+        assertThat(smartLights).isSuccessListHasSize(1)
+        val smartLight = smartLights.getItem(0)
         assertThat(smartLight).isEqualTo(testSmartLight)
     }
 
@@ -69,7 +76,7 @@ class TestSmartLightDatabase {
     fun `Insert two duplicate smart lights`() = runBlocking {
         // Check we don't have any data
         var smartLights = database.getAllSmartLights()
-        assertThat(smartLights).isEmpty()
+        assertThat(smartLights).isSuccessListEmpty()
 
         // Insert first smart light
         val testSmartLight = getTestSmartLight()
@@ -78,8 +85,8 @@ class TestSmartLightDatabase {
 
         // Assert added correctly
         smartLights = database.getAllSmartLights()
-        assertThat(smartLights).hasSize(1)
-        val smartLight1 = smartLights.last()
+        assertThat(smartLights).isSuccessListHasSize(1)
+        val smartLight1 = smartLights.getLastItem()
         assertThat(smartLight1).isEqualTo(testSmartLight)
 
         // Insert second smart light
@@ -89,8 +96,8 @@ class TestSmartLightDatabase {
 
         // Assert added correctly
         smartLights = database.getAllSmartLights()
-        assertThat(smartLights).hasSize(1)
-        val smartLight2 = smartLights.last()
+        assertThat(smartLights).isSuccessListHasSize(1)
+        val smartLight2 = smartLights.getLastItem()
         assertThat(smartLight2).isEqualTo(testSmartLight)
     }
 
@@ -98,7 +105,7 @@ class TestSmartLightDatabase {
     fun `Insert one smart light then update with second dataset`() = runBlocking {
         // Check we don't have any data
         var smartLights = database.getAllSmartLights()
-        assertThat(smartLights).isEmpty()
+        assertThat(smartLights).isSuccessListEmpty()
 
         // Add first smart light
         val testSmartLight = getTestSmartLight()
@@ -107,8 +114,8 @@ class TestSmartLightDatabase {
 
         // Assert added correctly
         smartLights = database.getAllSmartLights()
-        assertThat(smartLights).hasSize(1)
-        val smartLight1 = smartLights.last()
+        assertThat(smartLights).isSuccessListHasSize(1)
+        val smartLight1 = smartLights.getLastItem()
         assertThat(smartLight1).isEqualTo(testSmartLight)
 
         // Add same smart light with second set of data
@@ -122,8 +129,8 @@ class TestSmartLightDatabase {
 
         // Assert added correctly
         smartLights = database.getAllSmartLights()
-        assertThat(smartLights).hasSize(1)
-        val smartLight2 = smartLights.last()
+        assertThat(smartLights).isSuccessListHasSize(1)
+        val smartLight2 = smartLights.getLastItem()
         assertThat(smartLight2).isNotEqualTo(testSmartLight)
         assertThat(smartLight2.smartLightData).hasSize(2)
         assertThat(smartLight2.smartLightData).contains(testSmartLight.smartLightData.first())
@@ -134,7 +141,7 @@ class TestSmartLightDatabase {
     fun `Insert one smart light then update with second dataset with same timestamp`() = runBlocking {
         // Check we don't have any data
         var smartLights = database.getAllSmartLights()
-        assertThat(smartLights).isEmpty()
+        assertThat(smartLights).isSuccessListEmpty()
 
         // Add first smart light
         val testSmartLight = getTestSmartLight()
@@ -143,8 +150,8 @@ class TestSmartLightDatabase {
 
         // Assert added correctly
         smartLights = database.getAllSmartLights()
-        assertThat(smartLights).hasSize(1)
-        val smartLight1 = smartLights.last()
+        assertThat(smartLights).isSuccessListHasSize(1)
+        val smartLight1 = smartLights.getLastItem()
         assertThat(smartLight1).isEqualTo(testSmartLight)
 
         // Add same smart light with second set of data
@@ -158,8 +165,8 @@ class TestSmartLightDatabase {
 
         // Assert added correctly
         smartLights = database.getAllSmartLights()
-        assertThat(smartLights).hasSize(1)
-        val smartLight2 = smartLights.last()
+        assertThat(smartLights).isSuccessListHasSize(1)
+        val smartLight2 = smartLights.getLastItem()
         assertThat(smartLight2).isEqualTo(testSmartLight)
     }
 
@@ -168,7 +175,7 @@ class TestSmartLightDatabase {
     fun `Insert one smart light then update with the same dataset with different timestamp`() = runBlocking {
         // Check we don't have any data
         var smartLights = database.getAllSmartLights()
-        assertThat(smartLights).isEmpty()
+        assertThat(smartLights).isSuccessListEmpty()
 
         // Add first smart light
         val testSmartLight = getTestSmartLight()
@@ -177,8 +184,8 @@ class TestSmartLightDatabase {
 
         // Assert added correctly
         smartLights = database.getAllSmartLights()
-        assertThat(smartLights).hasSize(1)
-        val smartLight1 = smartLights.last()
+        assertThat(smartLights).isSuccessListHasSize(1)
+        val smartLight1 = smartLights.getLastItem()
         assertThat(smartLight1).isEqualTo(testSmartLight)
 
         // Add same smart light with second set of data
@@ -194,8 +201,8 @@ class TestSmartLightDatabase {
 
         // Assert added correctly
         smartLights = database.getAllSmartLights()
-        assertThat(smartLights).hasSize(1)
-        val smartLight2 = smartLights.last()
+        assertThat(smartLights).isSuccessListHasSize(1)
+        val smartLight2 = smartLights.getLastItem()
         assertThat(smartLight2).isEqualTo(testSmartLight)
     }
 
@@ -203,7 +210,7 @@ class TestSmartLightDatabase {
     fun `Insert one smart light then update with a dataset with a prior timestamp`() = runBlocking {
         // Check we don't have any data
         var smartLights = database.getAllSmartLights()
-        assertThat(smartLights).isEmpty()
+        assertThat(smartLights).isSuccessListEmpty()
 
         // Add first smart light
         val testSmartLight = getTestSmartLight()
@@ -212,8 +219,8 @@ class TestSmartLightDatabase {
 
         // Assert added correctly
         smartLights = database.getAllSmartLights()
-        assertThat(smartLights).hasSize(1)
-        val smartLight1 = smartLights.last()
+        assertThat(smartLights).isSuccessListHasSize(1)
+        val smartLight1 = smartLights.getLastItem()
         assertThat(smartLight1).isEqualTo(testSmartLight)
 
         // Add same smart light with second set of data
@@ -229,8 +236,8 @@ class TestSmartLightDatabase {
 
         // Assert added correctly
         smartLights = database.getAllSmartLights()
-        assertThat(smartLights).hasSize(1)
-        val smartLight2 = smartLights.last()
+        assertThat(smartLights).isSuccessListHasSize(1)
+        val smartLight2 = smartLights.getLastItem()
         assertThat(smartLight2.smartLightData).hasSize(2)
         assertThat(smartLight2.smartLightData).contains(testSmartLight.smartLightData.first())
         assertThat(smartLight2.smartLightData).contains(testSmartLight2.smartLightData.first())
@@ -240,7 +247,7 @@ class TestSmartLightDatabase {
     fun `Insert two different smart lights`() = runBlocking {
         // Check we don't have any data
         var smartLights = database.getAllSmartLights()
-        assertThat(smartLights).isEmpty()
+        assertThat(smartLights).isSuccessListEmpty()
 
         // Add first smart light
         val testSmartLight = getTestSmartLight()
@@ -249,8 +256,8 @@ class TestSmartLightDatabase {
 
         // Assert added correctly
         smartLights = database.getAllSmartLights()
-        assertThat(smartLights).hasSize(1)
-        val smartLight1 = smartLights.last()
+        assertThat(smartLights).isSuccessListHasSize(1)
+        val smartLight1 = smartLights.getLastItem()
         assertThat(smartLight1).isEqualTo(testSmartLight)
 
         // Add second smart light
@@ -260,8 +267,8 @@ class TestSmartLightDatabase {
 
         // Assert added correctly
         smartLights = database.getAllSmartLights()
-        assertThat(smartLights).hasSize(2)
-        val smartLight2 = smartLights.last()
+        assertThat(smartLights).isSuccessListHasSize(2)
+        val smartLight2 = smartLights.getLastItem()
         assertThat(smartLight2).isEqualTo(testSmartLight2)
     }
 
@@ -269,7 +276,7 @@ class TestSmartLightDatabase {
     fun `Insert one smart light and remove`() = runBlocking {
         // Check we don't have any data
         var smartLights = database.getAllSmartLights()
-        assertThat(smartLights).isEmpty()
+        assertThat(smartLights).isSuccessListEmpty()
 
         // Insert first smart light
         val testSmartLight = getTestSmartLight()
@@ -278,8 +285,8 @@ class TestSmartLightDatabase {
 
         // Assert added correctly
         smartLights = database.getAllSmartLights()
-        assertThat(smartLights).hasSize(1)
-        val smartLight = smartLights[0]
+        assertThat(smartLights).isSuccessListHasSize(1)
+        val smartLight = smartLights.getItem(0)
         assertThat(smartLight).isEqualTo(testSmartLight)
 
         // Remove smart light
@@ -288,14 +295,14 @@ class TestSmartLightDatabase {
 
         // Assert removed correctly
         smartLights = database.getAllSmartLights()
-        assertThat(smartLights).isEmpty()
+        assertThat(smartLights).isSuccessListEmpty()
     }
 
     @Test
     fun `Insert one smart light and remove it twice`() = runBlocking {
         // Check we don't have any data
         var smartLights = database.getAllSmartLights()
-        assertThat(smartLights).isEmpty()
+        assertThat(smartLights).isSuccessListEmpty()
 
         // Insert first smart light
         val testSmartLight = getTestSmartLight()
@@ -304,8 +311,8 @@ class TestSmartLightDatabase {
 
         // Assert added correctly
         smartLights = database.getAllSmartLights()
-        assertThat(smartLights).hasSize(1)
-        val smartLight = smartLights[0]
+        assertThat(smartLights).isSuccessListHasSize(1)
+        val smartLight = smartLights.getItem(0)
         assertThat(smartLight).isEqualTo(testSmartLight)
 
         // Remove smart light
@@ -314,7 +321,7 @@ class TestSmartLightDatabase {
 
         // Assert removed correctly
         smartLights = database.getAllSmartLights()
-        assertThat(smartLights).isEmpty()
+        assertThat(smartLights).isSuccessListEmpty()
 
         // Remove smart light again
         removed = database.removeSmartLight(testSmartLight.macAddress)
@@ -322,14 +329,14 @@ class TestSmartLightDatabase {
 
         // Assert that database is empty
         smartLights = database.getAllSmartLights()
-        assertThat(smartLights).isEmpty()
+        assertThat(smartLights).isSuccessListEmpty()
     }
 
     @Test
     fun `Insert smart light and get it`() = runBlocking {
         // Check we don't have any data
         var smartLights = database.getAllSmartLights()
-        assertThat(smartLights).isEmpty()
+        assertThat(smartLights).isSuccessListEmpty()
 
         // Insert first smart light
         val testSmartLight = getTestSmartLight()
@@ -338,8 +345,8 @@ class TestSmartLightDatabase {
 
         // Assert added correctly
         smartLights = database.getAllSmartLights()
-        assertThat(smartLights).hasSize(1)
-        val smartLight = smartLights[0]
+        assertThat(smartLights).isSuccessListHasSize(1)
+        val smartLight = smartLights.getItem(0)
         assertThat(smartLight).isEqualTo(testSmartLight)
 
         // Get smart light
@@ -352,7 +359,7 @@ class TestSmartLightDatabase {
     fun `Insert smart light and get the wrong one`() = runBlocking {
         // Check we don't have any data
         var smartLights = database.getAllSmartLights()
-        assertThat(smartLights).isEmpty()
+        assertThat(smartLights).isSuccessListEmpty()
 
         // Insert first smart light
         val testSmartLight = getTestSmartLight()
@@ -361,8 +368,8 @@ class TestSmartLightDatabase {
 
         // Assert added correctly
         smartLights = database.getAllSmartLights()
-        assertThat(smartLights).hasSize(1)
-        val smartLight = smartLights[0]
+        assertThat(smartLights).isSuccessListHasSize(1)
+        val smartLight = smartLights.getItem(0)
         assertThat(smartLight).isEqualTo(testSmartLight)
 
         // Get wrong smart light
@@ -375,7 +382,7 @@ class TestSmartLightDatabase {
     fun `Insert smart light and receive it through the flow`() = runBlocking {
         // Check we don't have any data
         val smartLights = database.getAllSmartLights()
-        assertThat(smartLights).isEmpty()
+        assertThat(smartLights).isSuccessListEmpty()
 
         // Setup data
         val testSmartLight = getTestSmartLight()
@@ -395,7 +402,7 @@ class TestSmartLightDatabase {
     fun `Insert two smart lights and receive it through the flow`() = runBlocking {
         // Check we don't have any data
         val smartLights = database.getAllSmartLights()
-        assertThat(smartLights).isEmpty()
+        assertThat(smartLights).isSuccessListEmpty()
 
         // Setup data
         val testSmartLight = getTestSmartLight()
@@ -427,7 +434,7 @@ class TestSmartLightDatabase {
     fun `Insert two smart lights of the same data and receive only one in the flow`() = runBlocking {
         // Check we don't have any data
         val smartLights = database.getAllSmartLights()
-        assertThat(smartLights).isEmpty()
+        assertThat(smartLights).isSuccessListEmpty()
 
         // Setup data
         val testSmartLight = getTestSmartLight()
@@ -451,7 +458,7 @@ class TestSmartLightDatabase {
     fun `Insert smart light and delete it and receive only the insert data in the flow`() = runBlocking {
         // Check we don't have any data
         val smartLights = database.getAllSmartLights()
-        assertThat(smartLights).isEmpty()
+        assertThat(smartLights).isSuccessListEmpty()
 
         // Setup data
         val testSmartLight = getTestSmartLight()
@@ -470,6 +477,18 @@ class TestSmartLightDatabase {
 
             expectNoEvents()
         }
+    }
+    
+    private fun <T> Result<List<T>>.get(): List<T> {
+        return this.getValueOrThrow()
+    }
+
+    private fun <T> Result<List<T>>.getItem(index: Int): T {
+        return this.getValueOrThrow()[index]
+    }
+
+    private fun <T> Result<List<T>>.getLastItem(): T {
+        return this.getValueOrThrow().last()
     }
 
     private fun getTestSmartLight(): SmartLight {
