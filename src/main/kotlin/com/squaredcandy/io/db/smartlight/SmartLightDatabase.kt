@@ -22,11 +22,11 @@ interface SmartLightDatabase {
      * Insert or update a smart light in the database
      *
      * @param smartLight Smart light to insert or update
-     * @return A [Result.Success]
+     * @return A [Result.Success] of the new smart light data
      * @exception DatabaseException in [Result.Failure] with type [DatabaseErrorType.NO_CHANGE] if not inserted
      * @exception DatabaseException in [Result.Failure] with type [DatabaseErrorType.CLOSED] if the database is closed
      */
-    suspend fun upsertSmartLight(smartLight: SmartLight): Result<Unit>
+    suspend fun upsertSmartLight(smartLight: SmartLight): Result<SmartLight>
 
     /**
      * Get a smart light with a specific [macAddress]
