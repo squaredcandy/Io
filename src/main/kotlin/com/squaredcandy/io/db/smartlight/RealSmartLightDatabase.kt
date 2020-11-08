@@ -56,7 +56,7 @@ internal class RealSmartLightDatabase(
         }
     }
 
-    override suspend fun upsertSmartLight(smartLight: SmartLight): Result<Unit> {
+    override suspend fun upsertSmartLight(smartLight: SmartLight): Result<SmartLight> {
         if(closed) return Result.Failure(DatabaseException(DatabaseErrorType.CLOSED))
         val entity = suspendedTransaction {
             SmartLightEntity.find { SmartLightSchema.macAddress eq smartLight.macAddress }.firstOrNull()
@@ -119,7 +119,7 @@ internal class RealSmartLightDatabase(
         closed = true
     }
 
-    private suspend fun insertSmartLight(smartLight: SmartLight): Result<Unit> {
+    private suspend fun insertSmartLight(smartLight: SmartLight): Result<SmartLight> {
         return getResultSuspended {
             suspendedTransaction {
                 val smartLightEntity = SmartLightEntity.new {
@@ -129,11 +129,12 @@ internal class RealSmartLightDatabase(
                     lastUpdated = smartLight.lastUpdated
                 }
                 insertSmartLightData(smartLight.smartLightData, smartLightEntity.id)
+                smartLight
             }
         }
     }
 
-    private suspend fun updateSmartLight(entity: SmartLightEntity, smartLight: SmartLight): Result<Unit> {
+    private suspend fun updateSmartLight(entity: SmartLightEntity, smartLight: SmartLight): Result<SmartLight> {
         val smartLightData = suspendedTransaction {
             entity.data.map { it.toSmartLightDataWithId() }
                 .plus(smartLight.smartLightData.map { null to it })
@@ -201,7 +202,7 @@ internal class RealSmartLightDatabase(
                     registerChange(SmartLightEntity, entity.id, EntityChangeType.Updated)
                 }
             }
-            Result.Success(Unit)
+            getSmartLight(smartLight.macAddress)
         } else Result.Failure(DatabaseException(DatabaseErrorType.NO_CHANGE))
     }
 
